@@ -1,6 +1,5 @@
 import dash
 from dash import dcc, html
-from dash.dependencies import Input, Output
 import plotly.express as px
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
@@ -59,30 +58,26 @@ def plot_charge_and_discharge():
 
     df['full']['fitted'] = list(df['charge']['fitted']) + list(df['discharge']['fitted'])
 
-    # Getting Maximum Slopes
-    """
-    slopes = get_maximum_slope()
-
-    charge_slope_x = np.linspace(0, 2500, 100)
-    charge_slope_y = slopes[0] * charge_slope_x
-
-    discharge_slope_x = np.linspace(discharge_time[0], discharge_time[0] + 2500, 100)
-    discharge_slope_y = slopes[1] * discharge_slope_x
-    discharge_slope_y -= min(discharge_slope_y)
-    """
-    
     # Expected Curve
 
     df['charge']['expected'] = [expected_charge(i - df['charge']['time'][0]) for i in df['charge']['time']]
     df['discharge']['expected'] = [expected_charge(i - df['discharge']['time'][0], False, 4.9) for i in df['discharge']['time']]
     df['full']['expected'] = df['charge']['expected'] + df['discharge']['expected']
 
+    # Extreme Slope
+    max_slope, min_slope = get_maximum_slope(list(df['full']['time']), df['full']['fitted'])
+
     # Error
     df['charge']['time_error'] = [0.005 for _ in df['charge']['time']]
-    df['charge']['tension_error'] = [t/20 for t in df['charge']['tension']]
+    df['charge']['tension_error'] = [0.1 + t/20 for t in df['charge']['tension']]
 
     df['discharge']['time_error'] = [0.005 for _ in df['discharge']['time']]
-    df['discharge']['tension_error'] = [t/20 for t in df['discharge']['tension']]
+    df['discharge']['tension_error'] = [0.1 + t/20 for t in df['discharge']['tension']]
+
+    # Logaroithmic Scale
+    df['charge']['logarithmic'] = np.log(df['charge']['fitted'])
+    df['discharge']['logarithmic'] = np.log(df['discharge']['fitted'])
+    df['full']['logarithmic'] = np.log(df['full']['tension'])
 
     del df['charge']['data']
     del df['discharge']['data']
@@ -171,9 +166,27 @@ def plot_charge_and_discharge():
 
     # Expected Curve & Fitted Curve
 
-    grids[1].add_trace(px.line(df['full'], x="time", y="expected", title='Expected Curve').data[0])
-    grids[1].add_trace(px.line(df['full'], x="time", y="fitted", title='Fitted Curve').data[0])
-    grids[1].layout.title = 'Expected Curve & Fitted Curve'
+    grids[1].add_trace(px.line(df['full'], x="time", y="expected", color_discrete_sequence=['green', 'green'], title='Expected Curve').data[0])
+    grids[1].add_trace(px.line(df['full'], x="time", y="fitted", color_discrete_sequence=['red', 'red'], title='Fitted Curve').data[0])
+
+    # Maximum Slope
+
+    grids[1].add_trace(px.line(x=[max_slope["Time"], max_slope["Time"]+5], y=[max_slope["Tension"], max_slope['Tension'] + 5*max_slope["Slope"]]).data[0])
+    grids[1].add_trace(px.line(x=[min_slope["Time"], min_slope["Time"]+5], y=[min_slope["Tension"], min_slope['Tension'] + 5*min_slope["Slope"]]).data[0])
+
+    # Layout shenanigans
+    grids[1].update_layout(
+        yaxis = dict(
+                title = 'Tension (V)',
+                range = [0, 5.5],
+                ticksuffix = 'V'
+            ),
+        xaxis = dict(
+                title = 'Time (s)',
+                ticksuffix = 's'
+            ),
+            title = 'Expected Curve & Fitted Curve'
+    )
 
     ## Third Row
 
@@ -187,33 +200,27 @@ def plot_charge_and_discharge():
     )
 
     # Logarithmic Charge Fitted Curve
-    grids[2].add_trace(px.line(df['charge'],    x="time", y="fitted").data[0], row=1, col=1)
+    grids[2].add_trace(px.line(df['charge'],    x="time", y="logarithmic").data[0], row=1, col=1)
 
     # Logarithmic Disharge Fitted Curve
 
-    grids[2].add_trace(px.line(df['discharge'], x="time", y="fitted").data[0], row=1, col=2)
+    grids[2].add_trace(px.line(df['discharge'], x="time", y="logarithmic").data[0], row=1, col=2)
     
     # Layout shenanigans
     grids[2].update_layout(
         yaxis = dict(
-                title = 'Tension (V)',
-                range = [0, 5.5],
-                ticksuffix = 'V'
+                title = 'Tension (Logarithmic)',
         ),
         xaxis = dict(
                 title = 'Time (s)',
-                ticksuffix = 's',
-                type = 'log'
+                ticksuffix = 's'
         ),
         yaxis2 = dict(
-                title = 'Tension (V)',
-                range = [0, 5.5],
-                ticksuffix = 'V'
+                title = 'Tension (Logarithmic)'
         ),
         xaxis2 = dict(
                 title = 'Time (s)',
-                ticksuffix = 's',
-                type = 'log'
+                ticksuffix = 's'
         )
     )
 
@@ -227,16 +234,23 @@ def expected_charge(time: int, charging: bool = True, starting_charge: int = 0):
     else:
         return starting_charge * np.exp(-(time) / tao)
 
-def get_maximum_slope() -> list[float]:
-    charge_df = pd.read_csv('data/charge.csv')
-    charge_df['Value'] = charge_df['Value'].astype(float)
-    charge_slopes = [(charge_df['Value'][i] - charge_df['Value'][i - 1]) / (charge_df['Parameter'][i] - charge_df['Parameter'][i - 1]) for i in range(1, len(charge_df['Value']))]
-    max_slope = max(charge_slopes)
+def get_maximum_slope(x, y) -> list[float]:
 
-    discharge_df = pd.read_csv('data/discharge.csv')
-    discharge_df['Value'] = discharge_df['Value'].astype(float)
-    discharge_slopes = [(discharge_df['Value'][i] - discharge_df['Value'][i - 1]) / (discharge_df['Parameter'][i] - discharge_df['Parameter'][i - 1]) for i in range(1, len(discharge_df['Value']))]
-    min_slope = min(discharge_slopes)
+    min_slope = {"Slope": 0, "Time": 0, "Tension": 0}
+    max_slope = {"Slope": 0, "Time": 0, "Tension": 0}
+
+    for t in range(len(x[1:])):
+        slope = (y[t+1] - y[t]) / (x[t+1] - x[t])
+
+        if slope > max_slope["Slope"]:
+            max_slope["Slope"] = slope
+            max_slope["Time"] = x[t]
+            max_slope["Tension"] = y[t]
+        
+        if slope < min_slope["Slope"]:
+            min_slope["Slope"] = slope
+            min_slope["Time"] = x[t]
+            min_slope["Tension"] = y[t]
 
     return max_slope, min_slope
 
