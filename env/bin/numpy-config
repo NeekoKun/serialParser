@@ -1,4 +1,4 @@
-#!/home/neeko/Scripts/serialParser/env/bin/python
+#!/home/neeko/Scripts/plotly_graphs/env/bin/python3.12
 # -*- coding: utf-8 -*-
 import re
 import sys

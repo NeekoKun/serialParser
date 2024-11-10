@@ -1,0 +1,6 @@
+/* Set the main container to be scrollable */
+.scrollable-container {
+    height: 100vh;           /* Adjust height as needed */
+    overflow-y: scroll;     /* Enable vertical scrolling */
+    overflow-x: hidden;     /* Disable horizontal scrolling (or set to scroll if needed) */
+}
