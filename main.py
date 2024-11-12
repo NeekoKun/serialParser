@@ -1,163 +1,381 @@
-import matplotlib.pyplot as plt
-import serial
+import dash
+from dash import dcc, html, dash_table
+import plotly.express as px
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
 import pandas as pd
-import time
 import numpy as np
-import scipy.optimize
+import scipy
 
-def read_serial_data():
-    ser = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
-    time.sleep(2)
-    while True:
-        with open('data.csv', 'w') as f:
-            try:
-                ser.flush()
-                msg = ser.readline()
-                try:
-                    value = msg.decode('utf-8')
-                except UnicodeDecodeError:
-                    continue
-                f.write(value)
-            except serial.serialutil.SerialException:
-                break
-
-def parse_to_csv():
-    with open('data.txt', 'r') as f:
-        lines = [line.strip() for line in f if line.strip()]
-
-    charge = [data.split(':') for data in lines[0].split(';')]
-    discharge = [data.split(':') for data in lines[1].split(';')]
-
-    charge_df = pd.DataFrame(charge, columns=['Parameter', 'Value'])
-    discharge_df = pd.DataFrame(discharge, columns=['Parameter', 'Value'])
-    charge_df.to_csv('data/charge.csv', index=False)
-    discharge_df.to_csv('data/discharge.csv', index=False)
+app = dash.Dash(__name__)
 
 def plot_charge_and_discharge():
     # Reading Data
 
-    charge_df = pd.read_csv('data/charge.csv')
-    discharge_df = pd.read_csv('data/discharge.csv')
+    df = {
+        'charge': {
+            'data': pd.read_csv('data/forged_charge.csv')
+        },
+        'discharge': {
+            'data': pd.read_csv('data/forged_discharge.csv')
+        },
+        'full': {
+            'data': pd.concat([pd.read_csv('data/charge.csv'), pd.read_csv('data/discharge.csv')])
+        }
+    }
 
-    charge_time = charge_df['Parameter'].astype(float)
-    discharge_time = discharge_df['Parameter'].astype(float)
-    time = pd.concat([charge_df['Parameter'], discharge_df['Parameter']]).astype(float)
+    # Getting Tension
+
+    df['charge']['tension'] = df['charge']['data']['Value'].astype(float)
+    df['discharge']['tension'] = df['discharge']['data']['Value'].astype(float)
+    df['full']['tension'] = pd.concat([df['charge']['tension'], df['discharge']['tension']])
+
+    # Getting Time
+
+    df['charge']['time'] = df['charge']['data']['Parameter'].astype(float) / 1000
+    df['discharge']['time'] = df['discharge']['data']['Parameter'].astype(float) / 1000
+    df['full']['time'] = pd.concat([df['charge']['time'], df['discharge']['time']])
 
     # Fitting Charge Data
 
     charge_values, _ = scipy.optimize.curve_fit(
         lambda t, a, b: a * (1 - np.exp(-t / b)),
-        charge_time,
-        charge_df['Value'].astype(float)
+        df['charge']['time'],
+        df['charge']['tension']
     )
 
-    fitted_charge = charge_values[0] * (1 - np.exp(-charge_time / charge_values[1]))
+    df['charge']['fitted'] = charge_values[0] * (1 - np.exp(-df['charge']['time'] / charge_values[1]))
     
     # Fitting Discharge Data
 
     discharge_values, _ = scipy.optimize.curve_fit(
         lambda t, a, b, c: a * np.exp(-(t + c) / b),
-        discharge_time - discharge_time[0] + 1,
-        discharge_df['Value'].astype(float)
+        df['discharge']['time'] - df['discharge']['time'][0],
+        df['discharge']['tension']
     )
 
-    fitted_discharge = discharge_values[0] * np.exp(-(discharge_time - discharge_time[0] + 1) / discharge_values[1])
+    df['discharge']['fitted'] = discharge_values[0] * np.exp(-(df['discharge']['time'] - df['discharge']['time'][0] + discharge_values[2]) / discharge_values[1])
 
-    fitted_curve = list(fitted_charge) + list(fitted_discharge)
-
-    # Getting Maximum Slopes
-
-    slopes = get_maximum_slope()
-
-    charge_slope_x = np.linspace(0, 2500, 100)
-    charge_slope_y = slopes[0] * charge_slope_x
-
-    discharge_slope_x = np.linspace(discharge_time[0], discharge_time[0] + 2500, 100)
-    discharge_slope_y = slopes[1] * discharge_slope_x
-    discharge_slope_y -= min(discharge_slope_y)
+    df['full']['fitted'] = list(df['charge']['fitted']) + list(df['discharge']['fitted'])
 
     # Expected Curve
 
-    expected_charging = [expected_charge(i - charge_df['Parameter'][0]) for i in charge_time]
-    expected_discharging = [expected_charge(i - discharge_df['Parameter'][0], False, 4.9) for i in discharge_time]
-    expected_curve = expected_charging + expected_discharging
+    df['charge']['expected'] = [expected_charge(i - df['charge']['time'][0]) for i in df['charge']['time']]
+    df['discharge']['expected'] = [expected_charge(i - df['discharge']['time'][0], False, 4.9) for i in df['discharge']['time']]
+    df['full']['expected'] = df['charge']['expected'] + df['discharge']['expected']
+
+    # Error
+    df['charge']['time_error'] = [0.005 for _ in df['charge']['time']]
+    df['charge']['tension_error'] = [0.1 for _ in df['charge']['tension']]
+
+    df['discharge']['time_error'] = [0.005 for _ in df['discharge']['time']]
+    df['discharge']['tension_error'] = [0.1 for _ in df['discharge']['tension']]
+
+    # Logaroithmic Scale
+    df['charge']['logarithmic'] = np.log(df['charge']['tension'])
+    df['discharge']['logarithmic'] = np.log(max(df['discharge']['tension'])/df['discharge']['tension'])
+    df['full']['logarithmic'] = np.log(df['full']['tension'])
+
+    # Logarithmic Fitting
+    df['charge']['logarithmic_fitting'] = np.log(df['charge']['fitted'])
+    df['discharge']['logarithmic_fitting'] = np.log(max(df['discharge']['fitted'])/df['discharge']['fitted'])
+    df['full']['logarithmic_fitting'] = np.log(df['full']['fitted'])
+
+    # Logarithmic Error
+    df['charge']['logarithmic_error'] = [0.1/v if v != 0 else 1 for v in df['charge']['tension']]
+    df['discharge']['logarithmic_error'] = [0.1/v if v != 0 else 1 for v in df['discharge']['tension']]
+    df['full']['logarithmic_error'] = [0.1/v if v != 0 else 1 for v in df['full']['tension']]
+
+    # Maximum and Minimum Slopes
+    max_slope, min_slope = get_maximum_slope(df['discharge']['time'], df['discharge']['logarithmic'], df['discharge']['time_error'], df['discharge']['logarithmic_error'])
+
+    del df['charge']['data']
+    del df['discharge']['data']
+    del df['full']['data']
+
+    ####################
+    # GENERATING TABLE #
+    ####################
+
+    table_values = [
+        [r'$V_{max}$', "5 V", f"{round(max(df['full']['tension']), 3)} ± 0.1 V"],
+        [r'$V_{min}$', "0 V", f"{round(min(df['discharge']['tension']), 3)} ± 0.1 V"],
+        [r'$K_{max}$', "N/A", f"{round(max_slope, 3)}"],
+        [r'$K_{min}$', "N/A", f"{round(min_slope, 3)}"],
+        ['Charge Deviation', "N/A", f"{round(residual_standard_deviation(df['charge']['tension'], df['charge']['fitted']), 3)}"],
+        ['Discharge Deviation', "N/A", f"{round(residual_standard_deviation(df['discharge']['tension'], df['discharge']['fitted']), 3)}"],
+        [r'$\tau_{charge}$', "2.7 s", f"{round(charge_values[1], 3)} ± 0.005 s"], # TODO: Control error
+        [r'$\tau_{discharge}$', "2.7 s", f"{round(discharge_values[1], 3)} ± 0.005 s"], # TODO: Control error
+        ['Charge Equation',
+         r'$V(t) = V_{max} \left(1 - e^{-\frac{t}{\tau}}\right)$',
+         r"$V(t) = {"+f"{round(charge_values[0], 3)}"+"} (1 - e^{-\\frac{{t}}{" + f"{round(charge_values[1], 3)}" + "}})$"],
+        ['Discharge Equation',
+         r'$V(t) = V_{max} e^{-\frac{t}{\tau}}$',
+         r"$V(t) = {"+f"{round(discharge_values[0], 3)}"+"} e^{-\\frac{{t}}{{{"+f"{round(discharge_values[1], 3)}"+"}}}}$"]
+    ]
+
+    table = f"""
+    | {'':^20} | {'Expected':^20} | {'Observed':^20} |
+    |{'-'*20}|{'-'*20}|{'-'*20}|
+    | {table_values[0][0]} | {table_values[0][1]} | {table_values[0][2]} |
+    | {table_values[1][0]} | {table_values[1][1]} | {table_values[1][2]} |
+    | {table_values[2][0]} | {table_values[2][1]} | {table_values[2][2]} |
+    | {table_values[3][0]} | {table_values[3][1]} | {table_values[3][2]} |
+    | {table_values[4][0]} | {table_values[4][1]} | {table_values[4][2]} |
+    | {table_values[5][0]} | {table_values[5][1]} | {table_values[5][2]} |
+    | {table_values[6][0]} | {table_values[6][1]} | {table_values[6][2]} |
+    | {table_values[7][0]} | {table_values[7][1]} | {table_values[7][2]} |
+    | {table_values[8][0]} | {table_values[8][1]} | {table_values[8][2]} |
+    | {table_values[9][0]} | {table_values[9][1]} | {table_values[9][2]} |
+    """
 
     ############
     # Plotting #
     ############
 
-    fig, axs = plt.subplots(2, 2, figsize=(10, 10))
+    grids = [None, None, None]
+
+    ## First Row
+
+    grids[0] = make_subplots(
+        rows=1,
+        cols=2, 
+        subplot_titles=(
+            'Charge Data & Fitted Line',
+            'Discharge Data & Fitted Line'
+        )
+    )
 
     # Charge Data & Fitted Line
 
-    axs[0, 0].scatter(charge_time, charge_df['Value'].astype(float), marker='o', s=10, label='Charge Data')
-    axs[0, 0].plot(charge_time, fitted_charge, color='red', label='Fitted Line')
-    axs[0, 0].fill_between(charge_time, charge_df['Value'] + 0.1, charge_df['Value'] - 0.1, color='blue', alpha=0.5, label='Error')
-    axs[0, 0].plot(charge_slope_x, charge_slope_y, color='green', linestyle='--', label='Maximum Slope')
-    axs[0, 0].legend()
-    axs[0, 0].set_title('Charge Data & Fitted Line')
-    axs[0, 0].set_xlabel('Milliseconds')
-    axs[0, 0].set_ylabel('Tension')
-    axs[0, 0].grid(True)
-    axs[0, 0].tick_params(axis='x', rotation=45)
-
+    grids[0].add_trace(px.scatter(df['charge'], x='time', y='tension', error_x='time_error', error_y='tension_error', title="Charge Data").data[0], row=1, col=1)
+    grids[0].add_trace(px.line(df['charge'], x="time", y="fitted", title='Fitted Line').data[0], row=1, col=1)
+    
     # Discharge Data & Fitted Line
 
-    axs[0, 1].scatter(discharge_time, discharge_df['Value'].astype(float), marker='o', s=10, label='Discharge Data')
-    axs[0, 1].plot(discharge_time, fitted_discharge, color='red', label='Fitted Line')
-    axs[0, 1].fill_between(discharge_time, discharge_df['Value'] + 0.1, discharge_df['Value'] - 0.1, color='blue', alpha=0.5, label='Error')
-    axs[0, 1].plot(discharge_slope_x, discharge_slope_y, color='green', linestyle='--', label='Maximum Slope')
-    axs[0, 1].set_title('Discharge Data & Fitted Line')
-    axs[0, 1].set_xlabel('Milliseconds')
-    axs[0, 1].set_ylabel('Tension')
-    axs[0, 1].grid(True)
-    axs[0, 1].tick_params(axis='x', rotation=45)
+    grids[0].add_trace(px.scatter(df['discharge'], x="time", y="tension", error_x="time_error", error_y="tension_error", title='Discharge Data').data[0], row=1, col=2)
+    grids[0].add_trace(px.line(df['discharge'], x="time", y="fitted", title='Fitted Line').data[0], row=1, col=2)
+
+    # Layout shenanigans
+
+    grids[0].update_traces(
+        line_color='red'
+    )
+
+    grids[0].update_layout(
+        yaxis = dict(
+                title = 'Tension (V)',
+                range = [0, 5.5],
+                ticksuffix = 'V'
+            ),
+        yaxis2 = dict(
+                title = 'Tension (V)',
+                range = [0, 5.5],
+                ticksuffix = 'V'
+            ),
+        xaxis = dict(
+                title = 'Time (s)',
+                ticksuffix = 's'
+            ),
+        xaxis2 = dict(
+                title = 'Time (s)',
+                ticksuffix = 's'
+            ),
+        updatemenus=[
+            dict(
+                type="buttons",
+                direction="right",
+                buttons=[
+                    dict(
+                        label="Toggle Error",
+                        method="update",
+                        args2=[{
+                            "error_y.visible": [False, False, False, False],
+                            "error_x.visible": [False, False, False, False]
+                            }],
+                        args=[{"error_y.visible": [True, False, True, False],
+                               "error_x.visible": [True, False, True, False]
+                            }],
+                    ),
+                ],
+                showactive=True,
+                x=0.5,
+                y=1.1,
+                xanchor="center",
+                yanchor="top"
+            )
+        ]
+    )
+    
+    ## Second Row
+
+    grids[1] = make_subplots( 
+        rows=1,
+        cols=1,
+        subplot_titles=(
+            'Logarithmic Charge Fitted Curve',
+            'Logarithmic Discharge Fitted Curve'
+        )
+    )
+
+    # Data Sample in Logarithmic Scale (Plotting limited number of samples)
+
+    grids[1].add_trace(px.scatter(
+        df['discharge'],
+        x='time',
+        y='logarithmic',
+        error_x='time_error',
+        error_y='logarithmic_error'
+    ).data[0], row=1, col=1)
+    
+    # Expected curve given tao
+    grids[1].add_trace(px.line(
+        x=[min(df['discharge']['time']), max(df['discharge']['time'])],
+        y=[0,(max(df['discharge']['time'])-min(df['discharge']['time']))/discharge_values[1]],
+        color_discrete_sequence=['red', 'red']
+    ).data[0], row=1, col=1)
+
+    # Maximum and Minimum Slopes
+    grids[1].add_trace(px.line(
+        x=[min(df['discharge']['time'])       , max(df['discharge']['time'])],
+        y=[min(df['discharge']['logarithmic']), (max(df['discharge']['time']) - min(df['discharge']['time'])) * max_slope],
+        color_discrete_sequence=['purple', 'purple']
+    ).data[0], row=1, col=1)
+
+    grids[1].add_trace(px.line(
+        x=[min(df['discharge']['time'])       , max(df['discharge']['time'])],
+        y=[min(df['discharge']['logarithmic']), (max(df['discharge']['time']) - min(df['discharge']['time'])) * min_slope],
+        color_discrete_sequence=['purple', 'purple']
+    ).data[0], row=1, col=1)
+    
+    # Layout shenanigans
+    grids[1].update_layout(
+        yaxis = dict(
+                title = r'$ln{\frac{V_{max}}{V(t)}}$',
+        ),
+        xaxis = dict(
+                title = 'Time (s)',
+                ticksuffix = 's'
+        ),
+        yaxis2 = dict(
+                title = 'Tension (Logarithmic)'
+        ),
+        xaxis2 = dict(
+                title = 'Time (s)',
+                ticksuffix = 's'
+        )
+    )
+
+    ## Third Row
+
+    grids[2] = go.Figure()
 
     # Expected Curve & Fitted Curve
 
-    axs[1, 0].plot(time, expected_curve, marker=',', label='Expected Curve')
-    axs[1, 0].plot(time, fitted_curve, color='blue', linestyle='--', label='Fitted Curve')
-    axs[1, 0].legend()
-    axs[1, 0].set_title('Fitted Curve & Expected Curve')
-    axs[1, 0].set_xlabel('Milliseconds')
-    axs[1, 0].set_ylabel('Tension')
-    axs[1, 0].grid(True)
-    axs[1, 0].tick_params(axis='x', rotation=45)
+    grids[2].add_trace(px.line(df['full'], x="time", y="expected", color_discrete_sequence=['green', 'green'], title='Expected Curve').data[0])
+    grids[2].add_trace(px.line(df['full'], x="time", y="fitted", color_discrete_sequence=['red', 'red'], title='Fitted Curve').data[0])
 
-    # Logarithmic Charge Fitted Curve
+    # Layout shenanigans
 
-    axs[1, 1].plot(discharge_time, discharge_df['Value'].astype(float), marker='o')
-    axs[1, 1].set_title('Logarithmic Discharge Fitted Curve')
-    axs[1, 1].set_xlabel('Milliseconds')
-    axs[1, 1].set_ylabel('Tension')
-    axs[1, 1].set_yscale('log')
-    axs[1, 1].grid(True)
-    axs[1, 1].tick_params(axis='x', rotation=45)
+    grids[2].update_layout(
+        yaxis = dict(
+                title = 'Tension (V)',
+                range = [0, 5.5],
+                ticksuffix = 'V'
+            ),
+        xaxis = dict(
+                title = 'Time (s)',
+                ticksuffix = 's'
+            ),
+        title = 'Expected Curve & Fitted Curve',
+        showlegend = True
+    )
 
-    # Show Plot
 
-    plt.tight_layout()
-    plt.show()
+    return grids, table
+
+def residual_standard_deviation(data, fitted):
+    residuals = []
+    
+    for d, f in zip(data, fitted):
+        residuals.append(d - f)
+    
+    return np.sqrt(sum([r**2 for r in residuals]) / (len(residuals)))
+
 
 def expected_charge(time: int, charging: bool = True, starting_charge: int = 0):
     v_max = 5
     tao = 2.7
     if charging:
-        return v_max * (1 - np.exp(-(time / 1000) / tao))
+        return v_max * (1 - np.exp(-(time) / tao))
     else:
-        return starting_charge * np.exp(-(time / 1000) / tao)
+        return starting_charge * np.exp(-(time) / tao)
 
-def get_maximum_slope() -> list[float]:
-    charge_df = pd.read_csv('data/charge.csv')
-    charge_df['Value'] = charge_df['Value'].astype(float)
-    charge_slopes = [(charge_df['Value'][i] - charge_df['Value'][i - 1]) / (charge_df['Parameter'][i] - charge_df['Parameter'][i - 1]) for i in range(1, len(charge_df['Value']))]
-    max_slope = max(charge_slopes)
+def get_maximum_slope(x, y, error_x, error_y) -> list[float]:
 
-    discharge_df = pd.read_csv('data/discharge.csv')
-    discharge_df['Value'] = discharge_df['Value'].astype(float)
-    discharge_slopes = [(discharge_df['Value'][i] - discharge_df['Value'][i - 1]) / (discharge_df['Parameter'][i] - discharge_df['Parameter'][i - 1]) for i in range(1, len(discharge_df['Value']))]
-    min_slope = min(discharge_slopes)
+    # "Sanitization"
+    x = [i - x[0] for i in x]
+    y = [i for i in y]
+    error_x = [i for i in error_x]
+    error_y = [i for i in error_y]
 
-    return max_slope, min_slope
+    for _x, _y, _error_x, _error_y in zip(x, y, error_x, error_y):
+        if (_x - _error_x < 0) or (_y - _error_y < 0):
+            x.remove(_x)
+            y.remove(_y)
+            error_x.remove(_error_x)
+            error_y.remove(_error_y)
 
-plot_charge_and_discharge()
+    max_slopes = []
+    min_slopes = []
+
+    for _x, _y, _error_x, _error_y in zip(x, y, error_x, error_y):
+        max_slopes.append((_y + _error_y) / (_x - _error_x))
+        min_slopes.append((_y - _error_y) / (_x + _error_x))
+
+    return min(max_slopes), max(min_slopes)
+
+if __name__ == "__main__":
+    fig, table = plot_charge_and_discharge()
+
+    app.layout = html.Div([
+        html.Iframe(
+            src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js?config=TeX-AMS-MML_HTMLorMML",
+            style={"display": "none"}
+        ),
+
+        dcc.Graph(
+            id='graph1',
+            figure=fig[0],
+            style={'height': '800px', 'width': '100vw'}
+        ),
+        
+        html.Div([
+            html.Div([
+                dcc.Graph(id='graph2',
+                    figure=fig[1],
+                    style={'height': '800px', 'width': '50vw'},
+                    mathjax=True
+                )
+            ], style={'flex': '1', 'height': '800px'}),
+
+            html.Div([
+                dcc.Markdown(
+                    children=table,
+                    dangerously_allow_html=True,
+                    style={"font-size": "20px", "white-space": "pre-line"},
+                    mathjax=True
+                )
+            ], style={'flex': '1', 'padding-top': '100px', 'padding-left': '80px', 'padding-right': '65px', 'padding-bottom': '80px'})
+
+        ], style={'display': 'flex', 'width': '100%', 'justify-content': 'space-around', 'height': '800px'}),
+
+        dcc.Graph(id='graph3',  
+                    figure=fig[2],
+                    style={'height': '800px', 'width': '100vw'},
+                    mathjax=True
+                )
+    ], className='scrollable-container'
+    )
+    
+    app.run_server(debug=True)
