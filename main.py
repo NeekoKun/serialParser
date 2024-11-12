@@ -20,7 +20,7 @@ def plot_charge_and_discharge():
             'data': pd.read_csv('data/forged_discharge.csv')
         },
         'full': {
-            'data': pd.concat([pd.read_csv('data/charge.csv'), pd.read_csv('data/discharge.csv')])
+            'data': pd.concat([pd.read_csv('data/forged_charge.csv'), pd.read_csv('data/forged_discharge.csv')])
         }
     }
 
@@ -65,10 +65,10 @@ def plot_charge_and_discharge():
     df['full']['expected'] = df['charge']['expected'] + df['discharge']['expected']
 
     # Error
-    df['charge']['time_error'] = [0.005 for _ in df['charge']['time']]
+    df['charge']['time_error'] = [0.05 for _ in df['charge']['time']]
     df['charge']['tension_error'] = [0.1 for _ in df['charge']['tension']]
 
-    df['discharge']['time_error'] = [0.005 for _ in df['discharge']['time']]
+    df['discharge']['time_error'] = [0.05 for _ in df['discharge']['time']]
     df['discharge']['tension_error'] = [0.1 for _ in df['discharge']['tension']]
 
     # Logaroithmic Scale
@@ -164,21 +164,21 @@ def plot_charge_and_discharge():
 
     grids[0].update_layout(
         yaxis = dict(
-                title = 'Tension (V)',
+                title = '$Tension (V)$',
                 range = [0, 5.5],
                 ticksuffix = 'V'
             ),
         yaxis2 = dict(
-                title = 'Tension (V)',
+                title = '$Tension (V)$',
                 range = [0, 5.5],
                 ticksuffix = 'V'
             ),
         xaxis = dict(
-                title = 'Time (s)',
+                title = '$Time (s)$',
                 ticksuffix = 's'
             ),
         xaxis2 = dict(
-                title = 'Time (s)',
+                title = '$Time (s)$',
                 ticksuffix = 's'
             ),
         updatemenus=[
@@ -187,7 +187,7 @@ def plot_charge_and_discharge():
                 direction="right",
                 buttons=[
                     dict(
-                        label="Toggle Error",
+                        label="",
                         method="update",
                         args2=[{
                             "error_y.visible": [False, False, False, False],
@@ -204,7 +204,8 @@ def plot_charge_and_discharge():
                 xanchor="center",
                 yanchor="top"
             )
-        ]
+        ],
+        template='plotly_dark'
     )
     
     ## Second Row
@@ -252,9 +253,10 @@ def plot_charge_and_discharge():
     grids[1].update_layout(
         yaxis = dict(
                 title = r'$ln{\frac{V_{max}}{V(t)}}$',
+                range=[0, 5.5]
         ),
         xaxis = dict(
-                title = 'Time (s)',
+                title = '$Time (s)$',
                 ticksuffix = 's'
         ),
         yaxis2 = dict(
@@ -263,7 +265,32 @@ def plot_charge_and_discharge():
         xaxis2 = dict(
                 title = 'Time (s)',
                 ticksuffix = 's'
-        )
+        ),
+        updatemenus=[
+            dict(
+                type="buttons",
+                direction="right",
+                buttons=[
+                    dict(
+                        label="",
+                        method="update",
+                        args2=[{
+                            "error_y.visible": [False, False, False, False],
+                            "error_x.visible": [False, False, False, False]
+                            }],
+                        args=[{"error_y.visible": [True, False, False, False],
+                               "error_x.visible": [True, False, False, False]
+                            }],
+                    ),
+                ],
+                showactive=True,
+                x=0.5,
+                y=1.1,
+                xanchor="center",
+                yanchor="top"
+            )
+        ],
+        template='plotly_dark'
     )
 
     ## Third Row
@@ -288,6 +315,7 @@ def plot_charge_and_discharge():
                 ticksuffix = 's'
             ),
         title = 'Expected Curve & Fitted Curve',
+        template='plotly_dark',
         showlegend = True
     )
 
@@ -347,7 +375,8 @@ if __name__ == "__main__":
         dcc.Graph(
             id='graph1',
             figure=fig[0],
-            style={'height': '800px', 'width': '100vw'}
+            style={'height': '800px', 'width': '100vw'},
+            mathjax=True
         ),
         
         html.Div([
@@ -366,7 +395,7 @@ if __name__ == "__main__":
                     style={"font-size": "20px", "white-space": "pre-line"},
                     mathjax=True
                 )
-            ], style={'flex': '1', 'padding-top': '100px', 'padding-left': '80px', 'padding-right': '65px', 'padding-bottom': '80px'})
+            ], style={'flex': '1', 'padding-top': '100px', 'padding-left': '80px', 'padding-right': '65px', 'padding-bottom': '80px', 'background-color': '#111111', 'color': '#f2f5fa'})
 
         ], style={'display': 'flex', 'width': '100%', 'justify-content': 'space-around', 'height': '800px'}),
 

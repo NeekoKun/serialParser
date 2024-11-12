@@ -3,7 +3,21 @@
     height: 100vh;           /* Adjust height as needed */
     overflow-y: scroll;     /* Enable vertical scrolling */
     overflow-x: hidden;     /* Disable horizontal scrolling (or set to scroll if needed) */
+    background-color: #111111;
 }
+
+.errorButton {
+
+}
+
+body {
+    margin: 0px;
+}
+
+.scrollable-container::-webkit-scrollbar {
+    display: none;
+}
+
 /*  when using Bootstrap, this will add row borders to the table in dcc.Markdown
  *   Table
 –––––––––––––––––––––––––––––––––––––––––––––––––– */
