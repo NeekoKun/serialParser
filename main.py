@@ -13,7 +13,7 @@ app = dash.Dash(__name__)
 primary1   = '#1e1e1e'
 primary2   = '#363636'
 primary3   = '#b3b3b3'
-highlight1 = '#8a5cf5'
+highlight1 = '#C7253E'
 highlight2 = '#ffffff'
 
 
@@ -156,18 +156,18 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x):
 
     # Charge Data & Fitted Line
 
-    grids[0].add_trace(px.scatter(df['charge'], x='time', y='tension', error_x='time_error', error_y='tension_error', title="Charge Data").data[0], row=1, col=1)
+    grids[0].add_trace(px.scatter(df['charge'], x='time', y='tension', error_x='time_error', error_y='tension_error', color_discrete_sequence=[highlight1], title="Charge Data").data[0], row=1, col=1)
     grids[0].add_trace(px.line(df['charge'], x="time", y="fitted", title='Fitted Line').data[0], row=1, col=1)
     
     # Discharge Data & Fitted Line
 
-    grids[0].add_trace(px.scatter(df['discharge'], x="time", y="tension", error_x="time_error", error_y="tension_error", title='Discharge Data').data[0], row=1, col=2)
+    grids[0].add_trace(px.scatter(df['discharge'], x="time", y="tension", error_x="time_error", error_y="tension_error", color_discrete_sequence=[highlight1], title='Discharge Data').data[0], row=1, col=2)
     grids[0].add_trace(px.line(df['discharge'], x="time", y="fitted", title='Fitted Line').data[0], row=1, col=2)
 
     # Layout shenanigans
 
     grids[0].update_traces(
-        line_color='red'
+        line_color=highlight2
     )
 
     grids[0].update_layout(
@@ -223,27 +223,28 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x):
         x=df['discharge']['time'][1::5],
         y=df['discharge']['logarithmic'][1::5],
         error_x=df['discharge']['time_error'][1::5],
-        error_y=df['discharge']['logarithmic_error'][1::5]
+        error_y=df['discharge']['logarithmic_error'][1::5],
+        color_discrete_sequence=[highlight1]
     ).data[0])
     
     # Expected curve given tao
     grids[1].add_trace(px.line(
         x=[min(df['discharge']['time']), max(df['discharge']['time'])],
         y=[0,(max(df['discharge']['time'])-min(df['discharge']['time']))/discharge_values[1]],
-        color_discrete_sequence=['red', 'red']
+        color_discrete_sequence=[highlight2]
     ).data[0])
 
     # Maximum and Minimum Slopes
     grids[1].add_trace(px.line(
         x=[min(df['discharge']['time'])       , max(df['discharge']['time'])],
         y=[min(df['discharge']['logarithmic']), (max(df['discharge']['time']) - min(df['discharge']['time'])) * max_slope],
-        color_discrete_sequence=['purple', 'purple']
+        color_discrete_sequence=[primary3]
     ).data[0])
 
     grids[1].add_trace(px.line(
         x=[min(df['discharge']['time'])       , max(df['discharge']['time'])],
         y=[min(df['discharge']['logarithmic']), (max(df['discharge']['time']) - min(df['discharge']['time'])) * min_slope],
-        color_discrete_sequence=['purple', 'purple']
+        color_discrete_sequence=[primary3]
     ).data[0])
     
     # Layout shenanigans
@@ -294,7 +295,7 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x):
 
     grids[2].update_layout(
         yaxis = dict(
-                title = '$\large{Tension (V)}$',
+                title = r'$\large{Tension (V)}$',
                 range = [0, 5.5],
                 ticksuffix = 'V',
                 zeroline = False,
@@ -302,7 +303,7 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x):
                 gridcolor = primary2
         ),
         xaxis = dict(
-                title = '$\large{Time (s)}$',
+                title = r'$\large{Time (s)}$',
                 ticksuffix = 's',
                 zeroline = False,
                 showline = False,
@@ -317,9 +318,7 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x):
         ),
 
         paper_bgcolor = primary1,
-        plot_bgcolor = primary1,
-
-        showlegend = True
+        plot_bgcolor = primary1
     )
 
 
@@ -453,5 +452,5 @@ if __name__ == "__main__":
         ], className='content')
     ])
 
-    app.run_server(debug=True)
+    app.run_server(debug=True, port=80)
 
