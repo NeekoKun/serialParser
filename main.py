@@ -1,5 +1,6 @@
 import dash
-from dash import dcc, html, dash_table
+from dash import dcc, html, Input, Output, State
+import dash_daq as daq
 import plotly.express as px
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
@@ -9,18 +10,25 @@ import scipy
 
 app = dash.Dash(__name__)
 
-def plot_charge_and_discharge():
+primary1   = '#1e1e1e'
+primary2   = '#363636'
+primary3   = '#b3b3b3'
+highlight1 = '#8a5cf5'
+highlight2 = '#ffffff'
+
+
+def plot_charge_and_discharge(charge, discharge, error_y, error_x):
     # Reading Data
 
     df = {
         'charge': {
-            'data': pd.read_csv('data/forged_charge.csv')
+            'data': pd.read_csv(f'data/{charge}.csv')
         },
         'discharge': {
-            'data': pd.read_csv('data/forged_discharge.csv')
+            'data': pd.read_csv(f'data/{discharge}.csv')
         },
         'full': {
-            'data': pd.concat([pd.read_csv('data/forged_charge.csv'), pd.read_csv('data/forged_discharge.csv')])
+            'data': pd.concat([pd.read_csv(f'data/{charge}.csv'), pd.read_csv(f'data/{discharge}.csv')])
         }
     }
 
@@ -65,11 +73,11 @@ def plot_charge_and_discharge():
     df['full']['expected'] = df['charge']['expected'] + df['discharge']['expected']
 
     # Error
-    df['charge']['time_error'] = [0.05 for _ in df['charge']['time']]
-    df['charge']['tension_error'] = [0.1 for _ in df['charge']['tension']]
+    df['charge']['time_error'] = [error_x for _ in df['charge']['time']]
+    df['charge']['tension_error'] = [error_y for _ in df['charge']['tension']]
 
-    df['discharge']['time_error'] = [0.05 for _ in df['discharge']['time']]
-    df['discharge']['tension_error'] = [0.1 for _ in df['discharge']['tension']]
+    df['discharge']['time_error'] = [error_x for _ in df['discharge']['time']]
+    df['discharge']['tension_error'] = [error_y for _ in df['discharge']['tension']]
 
     # Logaroithmic Scale
     df['charge']['logarithmic'] = np.log(df['charge']['tension'])
@@ -82,9 +90,9 @@ def plot_charge_and_discharge():
     df['full']['logarithmic_fitting'] = np.log(df['full']['fitted'])
 
     # Logarithmic Error
-    df['charge']['logarithmic_error'] = [0.1/v if v != 0 else 1 for v in df['charge']['tension']]
-    df['discharge']['logarithmic_error'] = [0.1/v if v != 0 else 1 for v in df['discharge']['tension']]
-    df['full']['logarithmic_error'] = [0.1/v if v != 0 else 1 for v in df['full']['tension']]
+    df['charge']['logarithmic_error'] = [error_y/v if v != 0 else 1 for v in df['charge']['tension']]
+    df['discharge']['logarithmic_error'] = [error_y/v if v != 0 else 1 for v in df['discharge']['tension']]
+    df['full']['logarithmic_error'] = [error_y/v if v != 0 else 1 for v in df['full']['tension']]
 
     # Maximum and Minimum Slopes
     max_slope, min_slope = get_maximum_slope(df['discharge']['time'], df['discharge']['logarithmic'], df['discharge']['time_error'], df['discharge']['logarithmic_error'])
@@ -164,133 +172,113 @@ def plot_charge_and_discharge():
 
     grids[0].update_layout(
         yaxis = dict(
-                title = '$Tension (V)$',
+                title = r'$\large{Tension (V)}$',
                 range = [0, 5.5],
-                ticksuffix = 'V'
-            ),
+                ticksuffix = 'V',
+                zeroline = False,
+                showline = False,
+                gridcolor = primary2
+        ),
+        
         yaxis2 = dict(
-                title = '$Tension (V)$',
+                title = r'$\large{Tension (V)}$',
                 range = [0, 5.5],
-                ticksuffix = 'V'
-            ),
+                ticksuffix = 'V',
+                zeroline = False,
+                showline = False,
+                gridcolor = primary2
+        ),
+        
         xaxis = dict(
-                title = '$Time (s)$',
-                ticksuffix = 's'
-            ),
+                title = r'$\large{Time (s)}$',
+                ticksuffix = 's',
+                zeroline = False,
+                showline = False,
+                gridcolor = primary2
+        ),
+        
         xaxis2 = dict(
-                title = '$Time (s)$',
-                ticksuffix = 's'
-            ),
-        updatemenus=[
-            dict(
-                type="buttons",
-                direction="right",
-                buttons=[
-                    dict(
-                        label="",
-                        method="update",
-                        args2=[{
-                            "error_y.visible": [False, False, False, False],
-                            "error_x.visible": [False, False, False, False]
-                            }],
-                        args=[{"error_y.visible": [True, False, True, False],
-                               "error_x.visible": [True, False, True, False]
-                            }],
-                    ),
-                ],
-                showactive=True,
-                x=0.5,
-                y=1.1,
-                xanchor="center",
-                yanchor="top"
-            )
-        ],
-        template='plotly_dark'
+                title = r'$\large{Time (s)}$',
+                ticksuffix = 's',
+                zeroline = False,
+                showline = False,
+                gridcolor = primary2
+        ),
+
+        font = dict(
+            color = primary3
+        ),
+
+        paper_bgcolor = primary1,
+        plot_bgcolor = primary1
     )
     
     ## Second Row
 
-    grids[1] = make_subplots( 
-        rows=1,
-        cols=1,
-        subplot_titles=(
-            'Logarithmic Charge Fitted Curve',
-            'Logarithmic Discharge Fitted Curve'
-        )
-    )
+    grids[1] = go.Figure()
 
     # Data Sample in Logarithmic Scale (Plotting limited number of samples)
 
     grids[1].add_trace(px.scatter(
-        df['discharge'],
-        x='time',
-        y='logarithmic',
-        error_x='time_error',
-        error_y='logarithmic_error'
-    ).data[0], row=1, col=1)
+        x=df['discharge']['time'][1::5],
+        y=df['discharge']['logarithmic'][1::5],
+        error_x=df['discharge']['time_error'][1::5],
+        error_y=df['discharge']['logarithmic_error'][1::5]
+    ).data[0])
     
     # Expected curve given tao
     grids[1].add_trace(px.line(
         x=[min(df['discharge']['time']), max(df['discharge']['time'])],
         y=[0,(max(df['discharge']['time'])-min(df['discharge']['time']))/discharge_values[1]],
         color_discrete_sequence=['red', 'red']
-    ).data[0], row=1, col=1)
+    ).data[0])
 
     # Maximum and Minimum Slopes
     grids[1].add_trace(px.line(
         x=[min(df['discharge']['time'])       , max(df['discharge']['time'])],
         y=[min(df['discharge']['logarithmic']), (max(df['discharge']['time']) - min(df['discharge']['time'])) * max_slope],
         color_discrete_sequence=['purple', 'purple']
-    ).data[0], row=1, col=1)
+    ).data[0])
 
     grids[1].add_trace(px.line(
         x=[min(df['discharge']['time'])       , max(df['discharge']['time'])],
         y=[min(df['discharge']['logarithmic']), (max(df['discharge']['time']) - min(df['discharge']['time'])) * min_slope],
         color_discrete_sequence=['purple', 'purple']
-    ).data[0], row=1, col=1)
+    ).data[0])
     
     # Layout shenanigans
     grids[1].update_layout(
         yaxis = dict(
-                title = r'$ln{\frac{V_{max}}{V(t)}}$',
-                range=[0, 5.5]
+                title = r'$\large{ln{\frac{V_{max}}{V(t)}}}$',
+                titlefont = dict(
+                    size = 20
+                ),
+                range = [0, 5.5],
+                zeroline = False,
+                showline = False,
+                gridcolor = primary2
         ),
+
         xaxis = dict(
-                title = '$Time (s)$',
-                ticksuffix = 's'
+                title = r'$\large{Time (s)}$',
+                titlefont = dict(
+                    size = 20
+                ),
+                ticksuffix = 's',
+                zeroline = False,
+                showline = False,
+                gridcolor = primary2
         ),
-        yaxis2 = dict(
-                title = 'Tension (Logarithmic)'
+
+        title = "Logaritmic Discharge & Fitted Curve",
+        title_x = 0.5,
+
+        font = dict(
+            color = primary3
         ),
-        xaxis2 = dict(
-                title = 'Time (s)',
-                ticksuffix = 's'
-        ),
-        updatemenus=[
-            dict(
-                type="buttons",
-                direction="right",
-                buttons=[
-                    dict(
-                        label="",
-                        method="update",
-                        args2=[{
-                            "error_y.visible": [False, False, False, False],
-                            "error_x.visible": [False, False, False, False]
-                            }],
-                        args=[{"error_y.visible": [True, False, False, False],
-                               "error_x.visible": [True, False, False, False]
-                            }],
-                    ),
-                ],
-                showactive=True,
-                x=0.5,
-                y=1.1,
-                xanchor="center",
-                yanchor="top"
-            )
-        ],
-        template='plotly_dark'
+
+        paper_bgcolor = primary1,
+        plot_bgcolor = primary1,
     )
 
     ## Third Row
@@ -306,16 +294,31 @@ def plot_charge_and_discharge():
 
     grids[2].update_layout(
         yaxis = dict(
-                title = 'Tension (V)',
+                title = '$\large{Tension (V)}$',
                 range = [0, 5.5],
-                ticksuffix = 'V'
-            ),
+                ticksuffix = 'V',
+                zeroline = False,
+                showline = False,
+                gridcolor = primary2
+        ),
         xaxis = dict(
-                title = 'Time (s)',
-                ticksuffix = 's'
-            ),
+                title = '$\large{Time (s)}$',
+                ticksuffix = 's',
+                zeroline = False,
+                showline = False,
+                gridcolor = primary2
+        ),
+
         title = 'Expected Curve & Fitted Curve',
-        template='plotly_dark',
+        title_x = 0.5,
+        
+        font = dict(
+            color = primary3
+        ),
+
+        paper_bgcolor = primary1,
+        plot_bgcolor = primary1,
+
         showlegend = True
     )
 
@@ -329,7 +332,6 @@ def residual_standard_deviation(data, fitted):
         residuals.append(d - f)
     
     return np.sqrt(sum([r**2 for r in residuals]) / (len(residuals)))
-
 
 def expected_charge(time: int, charging: bool = True, starting_charge: int = 0):
     v_max = 5
@@ -363,8 +365,33 @@ def get_maximum_slope(x, y, error_x, error_y) -> list[float]:
 
     return min(max_slopes), max(min_slopes)
 
+@app.callback(
+    Output('graph1', 'figure'),
+    Input('toggle-error-button', 'value'),
+    State('graph1', 'figure')
+)
+
+@app.callback(
+    Output('graph2', 'figure'),
+    Input('toggle-error-button', 'value'),
+    State('graph2', 'figure')
+)
+
+def toggle_error(value, figure):
+
+    new_figure = go.Figure(figure)
+
+    new_figure.update_traces(
+        error_x = dict(visible=value),
+        error_y = dict(visible=value),
+        selector= dict(mode='markers')
+    )
+
+    return new_figure
+
 if __name__ == "__main__":
-    fig, table = plot_charge_and_discharge()
+    #fig, table = plot_charge_and_discharge("charge", "discharge", 0.1, 0.005)
+    fig, table = plot_charge_and_discharge("forged_charge", "forged_discharge", 0.1, 0.005)
 
     app.layout = html.Div([
         html.Iframe(
@@ -372,39 +399,59 @@ if __name__ == "__main__":
             style={"display": "none"}
         ),
 
-        dcc.Graph(
-            id='graph1',
-            figure=fig[0],
-            style={'height': '800px', 'width': '100vw'},
-            mathjax=True
-        ),
-        
         html.Div([
             html.Div([
-                dcc.Graph(id='graph2',
-                    figure=fig[1],
-                    style={'height': '800px', 'width': '50vw'},
-                    mathjax=True
-                )
-            ], style={'flex': '1', 'height': '800px'}),
+                html.H1("Charge and Discharge of a Capacitor"),
+                html.H3("Physics Lab 1"),
+            ], className='title'),
 
             html.Div([
-                dcc.Markdown(
-                    children=table,
-                    dangerously_allow_html=True,
-                    style={"font-size": "20px", "white-space": "pre-line"},
-                    mathjax=True
+                daq.ToggleSwitch(
+                    id='toggle-error-button',
+                    value=True,
+                    vertical=True,
+                    className="error-switch"
                 )
-            ], style={'flex': '1', 'padding-top': '100px', 'padding-left': '80px', 'padding-right': '65px', 'padding-bottom': '80px', 'background-color': '#111111', 'color': '#f2f5fa'})
+            ], id='error-button-container')
+        ], className='header'),
 
-        ], style={'display': 'flex', 'width': '100%', 'justify-content': 'space-around', 'height': '800px'}),
+        html.Div([
+            dcc.Graph(
+                id='graph1',
+                figure=fig[0],
+                style={'height': '800px', 'width': '100vw'},
+                mathjax=True
+            ),
+            
+            html.Div([
+                html.Div([
+                    dcc.Graph(
+                        id='graph2',
+                        figure=fig[1],
+                        style={'height': '800px', 'width': '50vw'},
+                        mathjax=True
+                    )
+                ], style={'flex': '1', 'height': '800px'}),
 
-        dcc.Graph(id='graph3',  
-                    figure=fig[2],
-                    style={'height': '800px', 'width': '100vw'},
-                    mathjax=True
-                )
-    ], className='scrollable-container'
-    )
-    
+                html.Div([
+                    dcc.Markdown(
+                        children=table,
+                        dangerously_allow_html=True,
+                        className='table',
+                        mathjax=True
+                    )
+                ], style={'flex': '1', 'padding-top': '100px', 'padding-left': '80px', 'padding-right': '65px', 'padding-bottom': '80px', 'background-color': primary1, 'color': '#f2f5fa'})
+
+            ], style={'display': 'flex', 'width': '100%', 'justify-content': 'space-around', 'height': '800px'}),
+
+            dcc.Graph(
+                id='graph3',  
+                figure=fig[2],
+                style={'height': '800px', 'width': '100vw'},
+                mathjax=True
+            )
+        ], className='content')
+    ])
+
     app.run_server(debug=True)
+

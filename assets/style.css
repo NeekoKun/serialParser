@@ -1,46 +1,97 @@
+@charset "UTF-8";
 /* Set the main container to be scrollable */
-.scrollable-container {
-    height: 100vh;           /* Adjust height as needed */
-    overflow-y: scroll;     /* Enable vertical scrolling */
-    overflow-x: hidden;     /* Disable horizontal scrolling (or set to scroll if needed) */
-    background-color: #111111;
+.content {
+  padding-top: 80px;
+  height: 100%; /* Adjust height as needed  TODO: Fix here*/
 }
 
-.errorButton {
+.table {
+  font-size: 20px;
+  white-space: pre-line;
+  background-color: #1e1e1e;
+  color: #b3b3b3;
+}
 
+.header {
+  box-sizing: border-box;
+  background-color: #363636;
+  color: #b3b3b3;
+  padding: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  flex-direction: row;
+  width: 100%;
+  justify-content: space-between;
+  position: fixed;
+  z-index: 1000;
+}
+
+.title {
+  margin-right: auto;
+}
+
+#error-button-container {
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
+.error-switch *[class*=indicator] {
+  visibility: hidden;
+}
+
+.error-switch *[class*=background] {
+  background: #8a5cf5;
+}
+
+.error-switch *[class*=button] {
+  background: #ffffff;
+}
+
+.updatemenu-item-rect {
+  background-color: #ffffff;
+  border-radius: 5px;
+  fill: #FFFFFF;
+  padding: 5px;
+  margin: 5px;
+}
+
+h1 {
+  margin: 0px;
+  font-family: Arial;
+}
+
+h3 {
+  margin: 0px;
 }
 
 body {
-    margin: 0px;
-}
-
-.scrollable-container::-webkit-scrollbar {
-    display: none;
+  overscroll-behavior: none;
+  margin: 0px;
+  background-color: #1e1e1e;
 }
 
 /*  when using Bootstrap, this will add row borders to the table in dcc.Markdown
  *   Table
 –––––––––––––––––––––––––––––––––––––––––––––––––– */
 table {
-    border-collapse: collapse;
+  border-collapse: collapse;
 }
 
 th:not(.CalendarDay),
-
 td:not(.CalendarDay) {
-    padding: 12px 15px;
-    text-align: left;
-    border-bottom: 1px solid #E1E1E1;
+  padding: 12px 15px;
+  text-align: left;
+  border-bottom: 1px solid #b3b3b3;
 }
 
 th:first-child:not(.CalendarDay),
-
 td:first-child:not(.CalendarDay) {
-    padding-left: 0;
+  padding-left: 0;
 }
 
 th:last-child:not(.CalendarDay),
-
 td:last-child:not(.CalendarDay) {
-    padding-right: 0;
+  padding-right: 0;
 }
+
+/*# sourceMappingURL=style.css.map */
