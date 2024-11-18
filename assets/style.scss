@@ -10,6 +10,22 @@ $highlight2: #ffffff;
     height: 100%; /* Adjust height as needed  TODO: Fix here*/
 }
 
+body::-webkit-scrollbar {
+  display: none;
+}
+
+#left-spacer {
+    margin-top: auto;
+    margin-bottom: auto;
+    width: 65px;
+}
+
+#error-button-container {
+    margin-top: auto;
+    margin-bottom: auto;
+    width: 65px;
+}
+
 .table {
     font-size: 20px;
     white-space: pre-line;
@@ -32,12 +48,8 @@ $highlight2: #ffffff;
 }
 
 .title {
-    margin-right: auto;
-}
-
-#error-button-container {
-    margin-top: auto;
-    margin-bottom: auto;
+    margin: auto;
+    text-align: center;
 }
 
 .error-switch *[class*="indicator"] {
@@ -67,6 +79,7 @@ h1 {
 
 h3 {
     margin: 0px;
+    font-family: Arial;  
 }
 
 body {
