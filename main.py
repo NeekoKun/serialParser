@@ -17,7 +17,7 @@ highlight1 = "#C7253E"
 highlight2 = "#ffffff"
 
 
-def plot_charge_and_discharge(charge, discharge, error_y, error_x, error = False):
+def plot_charge_and_discharge(charge, discharge, error_y, error_x, error=False):
     # Reading Data
 
     spacing = 1
@@ -99,7 +99,7 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x, error = False
     # Logaroithmic Scale
     df["charge"]["logarithmic"] = np.log(df["charge"]["tension"])
     df["discharge"]["logarithmic"] = np.log(
-        max(df["discharge"]["tension"]) / df["discharge"]["tension"]
+        df["discharge"]["tension"]
     )
     df["full"]["logarithmic"] = np.log(df["full"]["tension"])
 
@@ -488,12 +488,12 @@ def get_maximum_slope(x, y, error_x, error_y) -> tuple:
 
 @app.callback(
     Output("graph1", "figure"),
-    Input("toggle-error-button", "value"),
+    Input("right-toggle-error-button", "value"),
     State("graph1", "figure"),
 )
 @app.callback(
     Output("graph2", "figure"),
-    Input("toggle-error-button", "value"),
+    Input("right-toggle-error-button", "value"),
     State("graph2", "figure"),
 )
 def toggle_error(value, figure):
@@ -525,7 +525,7 @@ if __name__ == "__main__":
                     html.Div(
                         [
                             daq.ToggleSwitch(
-                                id="toggle-error-button",
+                                id="left-toggle-error-button",
                                 value=True,
                                 vertical=True,
                                 className="error-switch",
@@ -543,7 +543,7 @@ if __name__ == "__main__":
                     html.Div(
                         [
                             daq.ToggleSwitch(
-                                id="toggle-error-button",
+                                id="right-toggle-error-button",
                                 value=True,
                                 vertical=True,
                                 className="error-switch",
