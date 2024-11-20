@@ -21,6 +21,7 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x, error=False):
     # Reading Data
 
     spacing = 1
+    v_max = 4.9
 
     df = {
         "charge": {"data": pd.read_csv(f"data/{charge}.csv")},
@@ -32,7 +33,7 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x, error=False):
                     pd.read_csv(f"data/{discharge}.csv"),
                 ]
             )
-        },
+        }
     }
 
     # Getting Tension
@@ -42,6 +43,7 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x, error=False):
     df["full"]["tension"] = pd.concat(
         [df["charge"]["tension"], df["discharge"]["tension"]]
     )
+
 
     # Getting Time
 
@@ -97,38 +99,36 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x, error=False):
     df["discharge"]["tension_error"] = [error_y for _ in df["discharge"]["tension"]]
 
     # Logaroithmic Scale
-    df["charge"]["logarithmic"] = np.log(
-        max(df["charge"]["tension"]) / (max(df["charge"]["tension"]) - df["charge"]["tension"])
-    )
-    df["discharge"]["logarithmic"] = np.log(
-        df["discharge"]["tension"]
-    )
+    df["charge"]["logarithmic"] = np.log(v_max / (v_max - df["charge"]["tension"]))
+    df["discharge"]["logarithmic"] = np.log(df["discharge"]["tension"])
     df["full"]["logarithmic"] = np.log(df["full"]["tension"])
 
     # Logarithmic Fitting
     df["charge"]["logarithmic_fitting"] = np.log(
-        max(df["charge"]["fitted"]) / (max(df["charge"]["fitted"]) - df["charge"]["fitted"])
+        max(df["charge"]["fitted"])
+        / (max(df["charge"]["fitted"]) - df["charge"]["fitted"])
     )
-    df["discharge"]["logarithmic_fitting"] = np.log(
-        df["discharge"]["fitted"]
-    )
+    df["discharge"]["logarithmic_fitting"] = np.log(df["discharge"]["fitted"])
     df["full"]["logarithmic_fitting"] = np.log(df["full"]["fitted"])
 
     # Logarithmic Error
     df["charge"]["logarithmic_error"] = [
-        error_y / v if v != 0 else 1 for v in df["charge"]["tension"]
+        1 / (v_max - v) if v > 0 and v != v_max else 1 for v in df["charge"]["tension"]
     ]
     df["discharge"]["logarithmic_error"] = [
-        error_y / v if v != 0 else 1 for v in df["discharge"]["tension"]
+        1 / v if v != 0 else 1 for v in df["discharge"]["tension"]
     ]
     df["full"]["logarithmic_error"] = [
-        error_y / v if v != 0 else 1 for v in df["full"]["tension"]
+        1 / v if v != 0 else 1 for v in df["full"]["tension"]
     ]
 
     # Fake Logarithmic Error
     df["charge"]["fake_logarithmic_error"] = df["charge"]["logarithmic_error"]
     df["discharge"]["fake_logarithmic_error"] = [
-        (error_y / max(df["discharge"]["tension"]) + error_y / v) * max(df["discharge"]["tension"]) / v for v in df["discharge"]["tension"]
+        (error_y / max(df["discharge"]["tension"]) + error_y / v)
+        * max(df["discharge"]["tension"])
+        / v
+        for v in df["discharge"]["tension"]
     ]
 
     # Maximum and Minimum Slopes
@@ -137,7 +137,7 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x, error=False):
         df["charge"]["logarithmic"],
         df["charge"]["time_error"],
         df["charge"]["logarithmic_error"],
-        charge=False
+        charge=True,
     )
 
     max_discharge_slope, min_discharge_slope = get_maximum_slope(
@@ -145,7 +145,7 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x, error=False):
         df["discharge"]["logarithmic"],
         df["discharge"]["time_error"],
         df["discharge"]["logarithmic_error"],
-        charge=False
+        charge=False,
     )
 
     del df["charge"]["data"]
@@ -177,7 +177,7 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x, error=False):
             f"{round(charge_values[1], 3)} ± 0.005 s",
         ],  # TODO: Control error
         [
-            r"$\tau_{discharge}$", 
+            r"$\tau_{discharge}$",
             f"2.7 ± {(27000*0.0001*0.05) + (27000*0.0001*0.05)} s",
             f"{round(charge_values[1], 3)} ± 0.005 s",
             f"{round(discharge_values[1], 3)} ± 0.005 s",
@@ -321,35 +321,29 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x, error=False):
 
     grids[1].add_trace(
         px.line(
-            df["charge"],
-            x="time",
-            y="fitted",
-            color_discrete_sequence=[highlight1]
+            df["charge"], x="time", y="fitted", color_discrete_sequence=[highlight1]
         ).data[0]
     )
 
     grids[1].add_trace(
         px.line(
-            df["charge"],
-            x="time",
-            y="expected",
-            color_discrete_sequence=[highlight2]
+            df["charge"], x="time", y="expected", color_discrete_sequence=[highlight2]
         ).data[0]
     )
-    
+
     grids[1].add_trace(
         px.line(
             x=df["discharge"]["time"] - min(df["discharge"]["time"]),
             y=df["discharge"]["fitted"],
-            color_discrete_sequence=[highlight1]
+            color_discrete_sequence=[highlight1],
         ).data[0]
     )
-    
+
     grids[1].add_trace(
         px.line(
             x=df["discharge"]["time"] - min(df["discharge"]["time"]),
             y=df["discharge"]["expected"],
-            color_discrete_sequence=[highlight2]
+            color_discrete_sequence=[highlight2],
         ).data[0]
     )
 
@@ -381,9 +375,9 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x, error=False):
     # Third Row
 
     grids[2] = make_subplots(
-            rows=1,
-            cols=2,
-            subplot_titles=["Logarithmic Charge", "Logarithmic Discharge"]
+        rows=1,
+        cols=2,
+        subplot_titles=["Logarithmic Charge", "Logarithmic Discharge"]
     )
 
     # Logarithmic Charge
@@ -394,12 +388,12 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x, error=False):
             y=df["charge"]["logarithmic"][::spacing],
             error_x=df["charge"]["time_error"][::spacing],
             error_y=df["charge"]["logarithmic_error"][::spacing],
-            color_discrete_sequence=[highlight1],
+            color_discrete_sequence=[highlight1]
         ).data[0],
         row=1,
-        col=1
+        col=1,
     )
- 
+
     if not error:
         grids[2].add_trace(
             px.scatter(
@@ -410,7 +404,7 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x, error=False):
                 color_discrete_sequence=[highlight1]
             ).data[0],
             row=1,
-            col=2
+            col=2,
         )
     else:
         grids[2].add_trace(
@@ -422,7 +416,7 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x, error=False):
                 color_discrete_sequence=[highlight1]
             ).data[0],
             row=1,
-            col=2
+            col=2,
         )
 
     # Max slope lines.
@@ -430,53 +424,96 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x, error=False):
     grids[2].add_trace(
         px.line(
             x=[min(df["charge"]["time"]), max(df["charge"]["time"])],
-            y=[df["charge"]["logarithmic"][0], (max(df["charge"]["time"]) - min(df["charge"]["time"])) * max_charge_slope],
-            color_discrete_sequence=[primary2]
+            y=[
+                df["charge"]["logarithmic"][0],
+                df["charge"]["logarithmic"][0]
+                + (max(df["charge"]["time"]) - min(df["charge"]["time"]))
+                * max_charge_slope,
+            ],
+            color_discrete_sequence=[primary2],
         ).data[0],
         row=1,
-        col=1
+        col=1,
+    )
+
+    grids[2].add_trace(
+        px.line(
+            x=[min(df["charge"]["time"]), max(df["charge"]["time"])],
+            y=[
+                df["charge"]["logarithmic"][0],
+                df["charge"]["logarithmic"][0]
+                + (max(df["charge"]["time"]) - min(df["charge"]["time"]))
+                * min_charge_slope,
+            ],
+            color_discrete_sequence=[primary1]
+        ).data[0],
+        row=1,
+        col=1,
     )
 
     grids[2].add_trace(
         px.line(
             x=[min(df["discharge"]["time"]), max(df["discharge"]["time"])],
-            y=[df["discharge"]["logarithmic"][0], df["discharge"]["logarithmic"][0] + (max(df["discharge"]["time"]) - min(df["discharge"]["time"])) * max_discharge_slope],
+            y=[
+                df["discharge"]["logarithmic"][0],
+                df["discharge"]["logarithmic"][0]
+                + (max(df["discharge"]["time"]) - min(df["discharge"]["time"]))
+                * max_discharge_slope,
+            ],
             color_discrete_sequence=[primary2]
         ).data[0],
         row=1,
-        col=2
+        col=2,
     )
 
     grids[2].add_trace(
         px.line(
             x=[min(df["discharge"]["time"]), max(df["discharge"]["time"])],
-            y=[df["discharge"]["logarithmic"][0], df["discharge"]["logarithmic"][0] + (max(df["discharge"]["time"]) - min(df["discharge"]["time"])) * min_discharge_slope],
+            y=[
+                df["discharge"]["logarithmic"][0],
+                df["discharge"]["logarithmic"][0]
+                + (max(df["discharge"]["time"]) - min(df["discharge"]["time"]))
+                * min_discharge_slope,
+            ],
             color_discrete_sequence=[primary2]
         ).data[0],
         row=1,
-        col=2
+        col=2,
     )
 
     # Fitted logarithmic line
 
     grids[2].add_trace(
         px.line(
-           df["discharge"],
-           x="time",
-           y="logarithmic_fitting",
-           color_discrete_sequence=[highlight2]
+            df["charge"],
+            x="time",
+            y="logarithmic_fitting",
+            color_discrete_sequence=[highlight2]
         ).data[0],
         row=1,
-        col=2
+        col=1,
+    )
+
+    grids[2].add_trace(
+        px.line(
+            df["discharge"],
+            x="time",
+            y="logarithmic_fitting",
+            color_discrete_sequence=[highlight2]
+        ).data[0],
+        row=1,
+        col=2,
     )
 
     # Layout shenanigans
 
     grids[2].update_layout(
         yaxis=dict(
-            title=r"$\large{Tension (V)}$",
-            range=[0, 5.5],
-            ticksuffix="V",
+            title=r"$\large{\ln{\frac{V_{max}}{V_{max} - V}}}$",
+            range=[
+                min(df["charge"]["logarithmic"]) - 0.5,
+                max(df["charge"]["logarithmic"]) + 0.5,
+            ],
             zeroline=False,
             showline=False,
             gridcolor=primary2,
@@ -489,18 +526,21 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x, error=False):
             gridcolor=primary2,
         ),
         yaxis2=dict(
-            title=r"$\large{Tension (V)}$",
-            ticksuffix="V",
+            title=r"$\large{\ln{V}}$",
+            range=[
+                min(df["discharge"]["logarithmic_fitting"]) - 0.5,
+                max(df["discharge"]["logarithmic_fitting"]) + 0.5,
+            ],
             zeroline=False,
             showline=False,
-            gridcolor=primary2
+            gridcolor=primary2,
         ),
         xaxis2=dict(
             title=r"$\large{Time (S)}$",
             ticksuffix="s",
             zeroline=False,
             showline=False,
-            gridcolor=primary2
+            gridcolor=primary2,
         ),
         title="Expected Curve & Fitted Curve",
         title_x=0.5,
@@ -534,12 +574,12 @@ def get_maximum_slope(x, y, error_x, error_y, charge=False) -> tuple:
 
     # "Sanitization"
     x = [i - x[0] for i in x]
-    y = [i - max(y) for i in y]
+    y = [i - y[0] for i in y]
     error_x = [i for i in error_x]
     error_y = [i for i in error_y]
 
     for _x, _y, _error_x, _error_y in zip(x, y, error_x, error_y):
-        if (_x - _error_x < 0):
+        if (_x - _error_x < 0) or (_x + _error_x == 0 and charge):
             x.remove(_x)
             y.remove(_y)
             error_x.remove(_error_x)
@@ -558,6 +598,7 @@ def get_maximum_slope(x, y, error_x, error_y, charge=False) -> tuple:
             min_slopes.append((_y - _error_y) / (_x - _error_x))
 
     return min(max_slopes), max(min_slopes)
+
 
 @app.callback(
     Output("graph1", "figure"),
@@ -581,11 +622,12 @@ def toggle_error(value, figure):
 
     return new_figure
 
+
 if __name__ == "__main__":
-    # fig, table = plot_charge_and_discharge("charge", "discharge", 0.1, 0.005, True)
-    fig, table = plot_charge_and_discharge(
-        "forged_charge", "forged_discharge", 0.1, 0.005, True
-    )
+    fig, table = plot_charge_and_discharge("charge", "discharge", 0.1, 0.005, True)
+    # fig, table = plot_charge_and_discharge(
+    #     "forged_charge", "forged_discharge", 0.1, 0.005, True
+    # )
 
     app.layout = html.Div(
         [
@@ -604,7 +646,7 @@ if __name__ == "__main__":
                                 className="error-switch",
                             )
                         ],
-                        id="left-spacer"
+                        id="left-spacer",
                     ),
                     html.Div(
                         [
