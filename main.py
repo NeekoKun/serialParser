@@ -16,7 +16,6 @@ primary3 = "#b3b3b3"
 highlight1 = "#C7253E"
 highlight2 = "#ffffff"
 
-
 def plot_charge_and_discharge(charge, discharge, error_y, error_x, error=False):
     # Reading Data
 
@@ -100,15 +99,15 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x, error=False):
 
     # Logaroithmic Scale
     df["charge"]["logarithmic"] = np.log(v_max / (v_max - df["charge"]["tension"]))
-    df["discharge"]["logarithmic"] = np.log(df["discharge"]["tension"])
-    df["full"]["logarithmic"] = np.log(df["full"]["tension"])
+    df["discharge"]["logarithmic"] = np.log(v_max / df["discharge"]["tension"])
+    df["full"]["logarithmic"] = df["charge"]["logarithmic"] + df["discharge"]["logarithmic"]
 
     # Logarithmic Fitting
     df["charge"]["logarithmic_fitting"] = np.log(
         max(df["charge"]["fitted"])
         / (max(df["charge"]["fitted"]) - df["charge"]["fitted"])
     )
-    df["discharge"]["logarithmic_fitting"] = np.log(df["discharge"]["fitted"])
+    df["discharge"]["logarithmic_fitting"] = np.log(max(df["discharge"]["fitted"]) / df["discharge"]["fitted"])
     df["full"]["logarithmic_fitting"] = np.log(df["full"]["fitted"])
 
     # Logarithmic Error
@@ -174,12 +173,12 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x, error=False):
         [
             r"$\tau_{charge}$",
             f"2.7 ± {(27000*0.0001*0.05) + (27000*0.0001*0.05)} s",
-            f"{round(charge_values[1], 3)} ± 0.005 s",
+            f"{round(charge_values[1], 3)} ± 0.1 s",
         ],  # TODO: Control error
         [
             r"$\tau_{discharge}$",
             f"2.7 ± {(27000*0.0001*0.05) + (27000*0.0001*0.05)} s",
-            f"{round(charge_values[1], 3)} ± 0.005 s",
+            f"{round(charge_values[1], 3)} ± 0.1 s",
             f"{round(discharge_values[1], 3)} ± 0.005 s",
         ],  # TODO: Control error
         [
@@ -279,7 +278,7 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x, error=False):
 
     grids[0].update_layout(
         yaxis=dict(
-            title=r"$\large{Tension (V)}$",
+            title="Tension (V)",
             range=[0, 5.5],
             ticksuffix="V",
             zeroline=False,
@@ -287,7 +286,7 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x, error=False):
             gridcolor=primary2,
         ),
         yaxis2=dict(
-            title=r"$\large{Tension (V)}$",
+            title="Tension (V)",
             range=[0, 5.5],
             ticksuffix="V",
             zeroline=False,
@@ -295,20 +294,20 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x, error=False):
             gridcolor=primary2,
         ),
         xaxis=dict(
-            title=r"$\large{Time (s)}$",
+            title="Time (s)",
             ticksuffix="s",
             zeroline=False,
             showline=False,
             gridcolor=primary2,
         ),
         xaxis2=dict(
-            title=r"$\large{Time (s)}$",
+            title="Time (s)",
             ticksuffix="s",
             zeroline=False,
             showline=False,
             gridcolor=primary2,
         ),
-        font=dict(color=primary3),
+        font=dict(color=primary3, size=16),
         paper_bgcolor=primary1,
         plot_bgcolor=primary1,
     )
@@ -350,15 +349,16 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x, error=False):
     # Layout shenanigans
     grids[1].update_layout(
         yaxis=dict(
-            title=r"$\large{Tension (V)}$",
+            title="Tension (V)",
             titlefont=dict(size=20),
-            range=[0, 5.5],
+            range=[-0.5, 5.5],
             zeroline=False,
             showline=False,
             gridcolor=primary2,
         ),
         xaxis=dict(
-            title=r"$\large{Time (s)}$",
+            title="Time (s)",
+            range=[-0.5, max(df["charge"]["time"])],
             titlefont=dict(size=20),
             ticksuffix="s",
             zeroline=False,
@@ -445,7 +445,7 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x, error=False):
                 + (max(df["charge"]["time"]) - min(df["charge"]["time"]))
                 * min_charge_slope,
             ],
-            color_discrete_sequence=[primary1]
+            color_discrete_sequence=[primary2]
         ).data[0],
         row=1,
         col=1,
@@ -519,14 +519,14 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x, error=False):
             gridcolor=primary2,
         ),
         xaxis=dict(
-            title=r"$\large{Time (s)}$",
+            title="Time (s)",
             ticksuffix="s",
             zeroline=False,
             showline=False,
             gridcolor=primary2,
         ),
         yaxis2=dict(
-            title=r"$\large{\ln{V}}$",
+            title=r"$\large{\ln{\frac{V_{max}}{V}}}$",
             range=[
                 min(df["discharge"]["logarithmic_fitting"]) - 0.5,
                 max(df["discharge"]["logarithmic_fitting"]) + 0.5,
@@ -536,7 +536,7 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x, error=False):
             gridcolor=primary2,
         ),
         xaxis2=dict(
-            title=r"$\large{Time (S)}$",
+            title="Time (s)",
             ticksuffix="s",
             zeroline=False,
             showline=False,
@@ -544,13 +544,51 @@ def plot_charge_and_discharge(charge, discharge, error_y, error_x, error=False):
         ),
         title="Expected Curve & Fitted Curve",
         title_x=0.5,
-        font=dict(color=primary3),
+        font=dict(color=primary3, size=16),
         paper_bgcolor=primary1,
         plot_bgcolor=primary1,
     )
 
-    return grids, table
+    e_l = ((1 / min_discharge_slope) - (1 / max_discharge_slope)) / 2
+    t_l = (1 / max_discharge_slope) + e_l
 
+
+    return grids, table, [[2.7, 0.27], [charge_values[1], 0.1], [discharge_values[1], 0.1], [t_l, e_l]]
+
+def plot_taos(taos: list[list]):
+
+    xs = []
+    ys = []
+    errors = []
+
+    for i, (tao, error) in enumerate(taos):
+        xs.append(tao)
+        ys.append(i)
+        errors.append(error)
+
+    fig = px.scatter(x=xs, y=ys, error_x=errors, color_discrete_sequence=[highlight1])
+    
+    fig.update_layout(
+        yaxis=dict(
+            title="",
+            zeroline=False,
+            showline=False,
+            gridcolor=primary2,
+        ),
+        xaxis=dict(
+            title="Time (s)",
+            zeroline=False,
+            showline=False,
+            gridcolor=primary2,
+        ),
+        title=r"$\large{\tau\ \textnormal{Comparison}}$",
+        title_x=0.5,
+        font=dict(color=primary3, size=16),
+        paper_bgcolor=primary1,
+        plot_bgcolor=primary1,
+    )
+
+    return fig
 
 def residual_standard_deviation(data, fitted):
     residuals = []
@@ -579,7 +617,7 @@ def get_maximum_slope(x, y, error_x, error_y, charge=False) -> tuple:
     error_y = [i for i in error_y]
 
     for _x, _y, _error_x, _error_y in zip(x, y, error_x, error_y):
-        if (_x - _error_x < 0) or (_x + _error_x == 0 and charge):
+        if (_x - _error_x <= 0) or (_x + _error_x == 0 and charge):
             x.remove(_x)
             y.remove(_y)
             error_x.remove(_error_x)
@@ -588,17 +626,11 @@ def get_maximum_slope(x, y, error_x, error_y, charge=False) -> tuple:
     max_slopes = []
     min_slopes = []
 
-    if charge:
-        for _x, _y, _error_x, _error_y in zip(x, y, error_x, error_y):
-            max_slopes.append((_y + _error_y) / (_x - _error_x))
-            min_slopes.append((_y - _error_y) / (_x + _error_x))
-    else:
-        for _x, _y, _error_x, _error_y in zip(x, y, error_x, error_y):
-            max_slopes.append((_y + _error_y) / (_x + _error_x))
-            min_slopes.append((_y - _error_y) / (_x - _error_x))
+    for _x, _y, _error_x, _error_y in zip(x, y, error_x, error_y):
+        max_slopes.append((_y + _error_y) / (_x - _error_x))
+        min_slopes.append((_y - _error_y) / (_x + _error_x))
 
     return min(max_slopes), max(min_slopes)
-
 
 @app.callback(
     Output("graph1", "figure"),
@@ -624,10 +656,12 @@ def toggle_error(value, figure):
 
 
 if __name__ == "__main__":
-    fig, table = plot_charge_and_discharge("charge", "discharge", 0.1, 0.005, True)
-    # fig, table = plot_charge_and_discharge(
-    #     "forged_charge", "forged_discharge", 0.1, 0.005, True
-    # )
+    # fig, table, ts = plot_charge_and_discharge("charge", "discharge", 0.1, 0.005, True)
+    fig, table, ts = plot_charge_and_discharge(
+        "forged_charge", "forged_discharge", 0.1, 0.005, True
+    )
+
+    taos = plot_taos(ts)
 
     app.layout = html.Div(
         [
@@ -722,6 +756,12 @@ if __name__ == "__main__":
                         figure=fig[2],
                         style={"height": "800px", "width": "100vw"},
                         mathjax=True,
+                    ),
+                    dcc.Graph(
+                        id="graph4",
+                        figure=taos,
+                        style={"height": "800px", "width": "100vw"},
+                        mathjax=True
                     ),
                 ],
                 className="content",
